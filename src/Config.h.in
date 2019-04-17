@@ -1,0 +1,2 @@
+#define assembly_VERSION_MAJOR @assembly_VERSION_MAJOR@
+#define assembly_VERSION_MINOR @assembly_VERSION_MINOR@
