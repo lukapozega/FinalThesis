@@ -18,4 +18,7 @@ configure_file(
 
 include_directories("${PROJECT_BINARY_DIR}")
 
+add_subdirectory(vendor/bioparser EXCLUDE_FROM_ALL)
+
 add_executable(assembly src/main.cpp)
+target_link_libraries(bioparser)
