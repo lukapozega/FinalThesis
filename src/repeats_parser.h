@@ -4,4 +4,6 @@ namespace repeats_parser {
 
 	void remove_covered(std::vector<std::tuple<std::string, int, int>> &repeats, std::vector<std::unique_ptr<PAFObject>> &paf_objects);
 
+	bool check_repeats(std::vector<std::tuple<std::string, int, int>> &repeats, const std::string& reference);
+
 }

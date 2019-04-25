@@ -13,6 +13,21 @@
 #include "PAFObject.cpp"
 #include "repeats_parser.h"
 
+class FASTAEntity {
+	
+	public:
+		std::string name;
+		std::string sequence;
+		
+		FASTAEntity(
+			const char *name, uint32_t name_length,
+			const char *sequence, uint32_t sequence_length) {
+
+			(this->name).assign(name, name_length);
+			(this->sequence).assign(sequence, sequence_length);
+		}
+};
+
 void sweepLineAlgorithm(std::vector<std::unique_ptr<PAFObject>> &paf_objects) {
 	auto paf_cmp = [](const std::unique_ptr<PAFObject>& a, const std::unique_ptr<PAFObject>& b) { 
  		if (a->t_begin == b->t_begin) {
@@ -39,10 +54,15 @@ int main(int argc, char** argv) {
 	auto paf_parser = bioparser::createParser<bioparser::PafParser, PAFObject>(argv[1]);
 	paf_parser->parse(paf_objects, -1);
 
+	std::vector<std::unique_ptr<FASTAEntity>> ref_objects;
+	auto fasta_parser = bioparser::createParser<bioparser::FastaParser, FASTAEntity>(argv[2]);
+	fasta_parser->parse(ref_objects, -1);
+	FASTAEntity reference = ref_objects[0];
+
 	sweepLineAlgorithm(paf_objects);
 
 	std::vector<std::tuple<std::string, int, int>> repeats;
-	repeats_parser::parse(repeats, argv[2]);
+	repeats_parser::parse(repeats, argv[3]);
 
 	repeats_parser::remove_covered(repeats, paf_objects);
 	std::cout << repeats.size() << std::endl;

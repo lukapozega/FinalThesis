@@ -13,7 +13,7 @@ namespace repeats_parser {
 	bool parse(std::vector<std::tuple<std::string, int, int>> &repeats, const std::string& path) {
 		std::ifstream input(path);
 		if (!input) {
-			std::cerr << "Cannot open the File : "<< path << std::endl;
+			std::cerr << "Cannot open the File : " << path << std::endl;
 			return false;
 		}
 		std::string line;
@@ -51,6 +51,22 @@ namespace repeats_parser {
 			}
 			current_paf++;
 		}
+	}
+
+	bool check_repeats(std::vector<std::tuple<std::string, int, int>> &repeats, const std::string& reference) {
+		int i, j;
+		std::string first, second;
+		for (i = 0; i < repeats.size()-1; i++) {
+			for (j = i + 1; j < repeats.size(); j++) {
+				if ((std::get<2>(repeats[i]) - std::get<1>(repeats[i])) != (std::get<2>(repeats[j]) - std::get<1>(repeats[j]))) continue;
+				first = reference.substr(std::get<1>(repeats[i]), (std::get<2>(repeats[i]) - std::get<1>(repeats[i])));
+				second = reference.substr(std::get<1>(repeats[j]), (std::get<2>(repeats[j]) - std::get<1>(repeats[j])));
+				if (first.compare(second) == 0) {
+					return false;
+				}
+			}
+		}
+		return true;
 	}
 
 } 
