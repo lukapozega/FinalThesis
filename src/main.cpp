@@ -53,21 +53,21 @@ int main(int argc, char** argv) {
 	std::vector<std::unique_ptr<PAFObject>> paf_objects;
 	auto paf_parser = bioparser::createParser<bioparser::PafParser, PAFObject>(argv[1]);
 	paf_parser->parse(paf_objects, -1);
+	sweepLineAlgorithm(paf_objects);
 
 	std::vector<std::unique_ptr<FASTAEntity>> ref_objects;
 	auto fasta_parser = bioparser::createParser<bioparser::FastaParser, FASTAEntity>(argv[2]);
 	fasta_parser->parse(ref_objects, -1);
 	FASTAEntity reference = ref_objects[0];
 
-	sweepLineAlgorithm(paf_objects);
-
 	std::vector<std::tuple<std::string, int, int>> repeats;
 	repeats_parser::parse(repeats, argv[3]);
-
 	repeats_parser::remove_covered(repeats, paf_objects);
-	std::cout << repeats.size() << std::endl;
-	std::tuple<std::string, int, int> r = repeats[0];
-	std::cout << std::get<1>(r) << " " << std::get<2>(r) << std::endl;
+
+	if (!repeats_parser::check_repeats(repeats, reference)) {
+		// two same repeats that are not covered by any sequences
+		printf("Genome can't be assembled\n");
+	}
 
 	return 0;
 
