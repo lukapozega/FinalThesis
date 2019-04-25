@@ -20,5 +20,7 @@ include_directories("${PROJECT_BINARY_DIR}")
 
 add_subdirectory(vendor/bioparser EXCLUDE_FROM_ALL)
 
+add_library(repeats_parser ${PROJECT_SOURCE_DIR}/src/repeats_parser.cpp)
+
 add_executable(assembly src/main.cpp)
-target_link_libraries(assembly bioparser)
+target_link_libraries(assembly bioparser repeats_parser)
