@@ -15,18 +15,56 @@
 
 class FASTAEntity {
 	
-	public:
-		std::string name;
-		std::string sequence;
-		
-		FASTAEntity(
-			const char *name, uint32_t name_length,
-			const char *sequence, uint32_t sequence_length) {
-
-			(this->name).assign(name, name_length);
-			(this->sequence).assign(sequence, sequence_length);
-		}
+public:
+	std::string name;
+	std::string sequence;
+	
+	FASTAEntity(
+		const char *name, uint32_t name_length,
+		const char *sequence, uint32_t sequence_length) {
+		(this->name).assign(name, name_length);
+		(this->sequence).assign(sequence, sequence_length);
+	}
 };
+
+class Vertex {
+
+public:
+	PAFObject read;
+	std::vector<Vertex*> vertices;
+
+	Vertex(PAFObject read) : read(read) {
+		this->read = read;
+	}
+};
+
+Vertex create_graph(std::vector<std::unique_ptr<PAFObject>> &paf_objects) {
+	std::vector<Vertex> vertices;
+	for (auto const& paf: paf_objects) {
+		vertices.emplace_back(Vertex(*paf));
+	}
+	std::vector<Vertex>::iterator it = vertices.begin();
+	std::vector<Vertex>::iterator next;
+	while(it != --vertices.end()) {
+		next = std::next(it);
+		while ((*next).read.t_begin <= (*it).read.t_end) {
+			it->vertices.emplace_back(&(*next));
+			next++;
+			if(next == vertices.end()) break;
+		}
+		it++;
+	}
+	FILE* file = fopen ("network.txt","w");
+	for (auto const& vertex: vertices) {
+		fprintf (file, "%d %d", vertex.read.t_begin, vertex.read.t_end);
+		for (auto const& next: vertex.vertices) {
+			fprintf (file, " %d", next->read.t_begin);
+		}
+		fprintf (file, "\n");
+	}
+	fclose (file);
+	return vertices[0];
+}
 
 void sweepLineAlgorithm(std::vector<std::unique_ptr<PAFObject>> &paf_objects) {
 	auto paf_cmp = [](const std::unique_ptr<PAFObject>& a, const std::unique_ptr<PAFObject>& b) { 
@@ -58,16 +96,18 @@ int main(int argc, char** argv) {
 	std::vector<std::unique_ptr<FASTAEntity>> ref_objects;
 	auto fasta_parser = bioparser::createParser<bioparser::FastaParser, FASTAEntity>(argv[2]);
 	fasta_parser->parse(ref_objects, -1);
-	FASTAEntity reference = ref_objects[0];
+	FASTAEntity reference = *ref_objects[0];
 
 	std::vector<std::tuple<std::string, int, int>> repeats;
 	repeats_parser::parse(repeats, argv[3]);
 	repeats_parser::remove_covered(repeats, paf_objects);
 
-	if (!repeats_parser::check_repeats(repeats, reference)) {
+	if (!repeats_parser::check_repeats(repeats, reference.sequence)) {
 		// two same repeats that are not covered by any sequences
 		printf("Genome can't be assembled\n");
 	}
+
+	create_graph(paf_objects);
 
 	return 0;
 
