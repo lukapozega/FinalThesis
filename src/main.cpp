@@ -145,7 +145,7 @@ int main(int argc, char** argv) {
 	repeats_parser::parse(repeats, argv[3]);
 	repeats_parser::remove_covered(repeats, paf_objects);
 
-	auto repeats_result = repeats_parser::check_repeats(repeats, reference.sequence)
+	auto repeats_result = repeats_parser::check_repeats(repeats, reference.sequence);
 
 	if (std::get<0>(repeats_result) != -1) {
 		printf("Genome can't be assembled\n");
