@@ -125,7 +125,7 @@ void statistics(Vertex* end, FASTAEntity &reference) {
 		end = end->parent;
 	}
 	fclose (file);
-	printf("Genome coverage: %f%\n", (last_index - end->read.t_begin) / (float) reference.sequence.length() * 100);
+	printf("Genome coverage: %f%%\n", (last_index - end->read.t_begin) / (float) reference.sequence.length() * 100);
 	printf("Number of used reads: %d\n", count);
 }
 
