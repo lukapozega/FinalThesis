@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <getopt.h>
 #include <iostream>
 #include <vector>
 #include <string>
@@ -12,6 +13,12 @@
 #include "bioparser/bioparser.hpp"
 #include "PAFObject.cpp"
 #include "repeats_parser.h"
+
+struct option options[] = {
+	{"version", no_argument, 0, 'v'},
+	{"help", no_argument, 0, 'h'},
+	{0, 0, 0, 0}
+};
 
 class FASTAEntity {
 	
@@ -129,22 +136,57 @@ void statistics(Vertex* end, FASTAEntity &reference) {
 	printf("Number of used reads: %d\n", count);
 }
 
+void help() {
+	printf("Program accepts three arguments and prints assemblying statistics.\n");
+	printf("Usage: assembly <alignment file file> <reference file> <repeats file>\n");
+	printf("Arguments should be in PAF, fasta and rpt file format\n");
+}
+
+void version() {
+	printf("Version %d.%d\n", assembly_VERSION_MAJOR, assembly_VERSION_MINOR);
+}
+
 int main(int argc, char** argv) {
 
+	char optchr;
+	int option_index = 0;
+	while((optchr = getopt_long(argc, argv, "hv", options, &option_index)) != -1) {
+		switch (optchr) {
+			case 'h': {
+				help();
+				return 1;
+			}
+			case 'v': {
+				version();
+				return 1;
+			}
+			default: {
+				fprintf(stderr, "Unknown option -%c\n", optchr);
+				return 1;
+			}
+		}
+	}
+
+	if(argc - optind < 4) {
+		fprintf(stderr, "Program requires three arguments.\n");
+		fprintf(stderr, "Use \"-h\" or \"--help\" for more information.\n");
+		return 1;
+	}
+
 	std::vector<std::unique_ptr<PAFObject>> paf_objects;
-	auto paf_parser = bioparser::createParser<bioparser::PafParser, PAFObject>(argv[1]);
+	auto paf_parser = bioparser::createParser<bioparser::PafParser, PAFObject>(argv[optind]);
 	paf_parser->parse(paf_objects, -1);
 	sweepLineAlgorithm(paf_objects);
 
 	std::vector<std::unique_ptr<FASTAEntity>> ref_objects;
-	auto fasta_parser = bioparser::createParser<bioparser::FastaParser, FASTAEntity>(argv[2]);
+	auto fasta_parser = bioparser::createParser<bioparser::FastaParser, FASTAEntity>(argv[optind + 1]);
 	fasta_parser->parse(ref_objects, -1);
 	FASTAEntity reference = *ref_objects[0];
 
 	std::vector<std::tuple<std::string, int, int>> repeats;
 	if (!repeats_parser::parse(repeats, argv[3])) {
-		fprintf(stderr, "Error reading file %s\n", argv[3]);
-		return 0;
+		fprintf(stderr, "Error reading file %s\n", argv[optind + 2]);
+		return 1;
 	}
 
 	repeats_parser::remove_covered(repeats, paf_objects);
