@@ -145,9 +145,14 @@ int main(int argc, char** argv) {
 	repeats_parser::parse(repeats, argv[3]);
 	repeats_parser::remove_covered(repeats, paf_objects);
 
-	if (!repeats_parser::check_repeats(repeats, reference.sequence)) {
-		// two same repeats that are not covered by any sequences
+	auto repeats_result = repeats_parser::check_repeats(repeats, reference.sequence)
+
+	if (std::get<0>(repeats_result) != -1) {
 		printf("Genome can't be assembled\n");
+		printf("Non covered areas are matching:\n");
+		printf("%d-%d\n", std::get<0>(repeats_result),std::get<1>(repeats_result));
+		printf("%d-%d\n", std::get<2>(repeats_result),std::get<3>(repeats_result));
+		return 0;
 	}
 
 	std::vector<Vertex> vertices;

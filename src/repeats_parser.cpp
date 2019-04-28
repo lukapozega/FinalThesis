@@ -53,7 +53,7 @@ namespace repeats_parser {
 		}
 	}
 
-	bool check_repeats(std::vector<std::tuple<std::string, int, int>> &repeats, const std::string& reference) {
+	std::tuple<int, int, int, int> check_repeats(std::vector<std::tuple<std::string, int, int>> &repeats, const std::string& reference) {
 		int i, j;
 		std::string first, second;
 		for (i = 0; i < repeats.size()-1; i++) {
@@ -62,11 +62,11 @@ namespace repeats_parser {
 				first = reference.substr(std::get<1>(repeats[i]), (std::get<2>(repeats[i]) - std::get<1>(repeats[i])));
 				second = reference.substr(std::get<1>(repeats[j]), (std::get<2>(repeats[j]) - std::get<1>(repeats[j])));
 				if (first.compare(second) == 0) {
-					return false;
+					return std::make_tuple(std::get<1>(repeats[i]), std::get<2>(repeats[i]), std::get<1>(repeats[j]), std::get<2>(repeats[j]));
 				}
 			}
 		}
-		return true;
+		return std::make_tuple(-1,-1,-1,-1);
 	}
 
 } 
