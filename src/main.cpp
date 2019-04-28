@@ -142,7 +142,11 @@ int main(int argc, char** argv) {
 	FASTAEntity reference = *ref_objects[0];
 
 	std::vector<std::tuple<std::string, int, int>> repeats;
-	repeats_parser::parse(repeats, argv[3]);
+	if (!repeats_parser::parse(repeats, argv[3])) {
+		fprintf(stderr, "Error reading file %s\n", argv[3]);
+		return 0;
+	}
+
 	repeats_parser::remove_covered(repeats, paf_objects);
 
 	auto repeats_result = repeats_parser::check_repeats(repeats, reference.sequence);

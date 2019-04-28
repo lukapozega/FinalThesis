@@ -13,7 +13,6 @@ namespace repeats_parser {
 	bool parse(std::vector<std::tuple<std::string, int, int>> &repeats, const std::string& path) {
 		std::ifstream input(path);
 		if (!input) {
-			std::cerr << "Cannot open the File : " << path << std::endl;
 			return false;
 		}
 		std::string line;
@@ -24,6 +23,9 @@ namespace repeats_parser {
 			for(std::string s; iss >> s; ) {
 				result.push_back(s);
 			}
+			if (result.size()!=10){
+				return false;
+			} 
 			name.assign(result[0], 1, result[0].size()-1);
 			repeats.emplace_back(name, std::atoi(result[9].c_str()), std::atoi(result[10].c_str()));
 		}
