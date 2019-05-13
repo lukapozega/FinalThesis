@@ -17,17 +17,14 @@ namespace repeats_parser {
 		}
 		std::string line;
 		std::string name;
+		std::string loc;
+		int start, end;
 		while (std::getline(input, line)) {
-			std::vector<std::string> result;
-			std::istringstream iss(line);
-			for(std::string s; iss >> s; ) {
-				result.push_back(s);
-			}
-			if (result.size() != 11){
-				return false;
-			} 
-			name.assign(result[0], 1, result[0].size()-1);
-			repeats.emplace_back(name, std::atoi(result[9].c_str()), std::atoi(result[10].c_str()));
+			name = line.substr(1, line.find(":"));
+			loc = line.substr(line.find(":") + 1);
+			start = std::atoi(loc.substr(0, loc.find("-")).c_str());
+			end = std::atoi(loc.substr(loc.find("-") + 1).c_str());
+			repeats.emplace_back(name, start, end);
 		}
 		return true;
 	}
