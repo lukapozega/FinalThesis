@@ -23,7 +23,7 @@ namespace repeats_parser {
 			for(std::string s; iss >> s; ) {
 				result.push_back(s);
 			}
-			if (result.size()!=10){
+			if (result.size() != 11){
 				return false;
 			} 
 			name.assign(result[0], 1, result[0].size()-1);
@@ -50,6 +50,20 @@ namespace repeats_parser {
 					current_rpt++;
 				}
 				if (current_rpt == repeats.end()) return;
+			}
+			if (std::get<1>(*current_rpt) >= (*current_paf)->t_begin && std::get<1>(*current_rpt) <= (*current_paf)->t_end) {
+				int i = 1;
+				do {
+					if (current_paf + i == paf_objects.end()) return;
+					if ((*(current_paf + i))->t_begin <= (*current_paf)->t_end && std::get<2>(*current_rpt) <= (*(current_paf + i))->t_end) {
+						current_rpt = repeats.erase(current_rpt);
+						break;
+					}
+					else {
+						i++;
+					}
+				} while ((*(current_paf + i))->t_begin <= (*current_paf)->t_end);
+				
 			}
 			current_paf++;
 		}
