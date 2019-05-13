@@ -7,6 +7,7 @@
 #include <fstream> 
 #include <sstream>
 #include <tuple>
+#include <unordered_map>
 
 #include "Config.h"
 
@@ -19,6 +20,13 @@ struct option options[] = {
 	{"help", no_argument, 0, 'h'},
 	{0, 0, 0, 0}
 };
+
+std::unordered_map<char, char> complement_map = {
+			{'A', 'T'},
+			{'T', 'A'},
+			{'G', 'C'},
+			{'C', 'G'},
+	};
 
 class FASTAEntity {
 	
@@ -57,7 +65,6 @@ std::vector<Vertex*> create_graph(std::vector<Vertex> &vertices, std::vector<std
 	while(it != --vertices.end()) {
 		next = std::next(it);
 		while ((*next).read.t_begin <= (*it).read.t_end) {
-			//std::cout << (*it).read.t_begin << std::endl;
 			it->vertices.emplace_back(&(*next));
 			next++;
 			if(next == vertices.end()) break;
@@ -102,7 +109,27 @@ Vertex* DepthFirstSearch(std::vector<Vertex*> heads) {
 	return longest;
 }
 
-void sweepLineAlgorithm(std::vector<std::unique_ptr<PAFObject>> &paf_objects) {
+void clear_contained_reads(std::vector<std::unique_ptr<PAFObject>> &paf_objects) {
+	std::vector<std::unique_ptr<PAFObject>>::iterator it = paf_objects.begin();
+	int best;
+	std::string name;
+	while (it != --paf_objects.end()) {
+		name = (*it)->query_name;
+		best = (*it)->q_end - (*it)->q_begin;
+		it++;
+		while ((*it)->query_name == name) {
+			if ((*it)->q_end - (*it)->q_begin > best) {
+				name = (*it)->query_name;
+				best = (*it)->q_end - (*it)->q_begin;
+				it = paf_objects.erase(--it);
+			} else {
+				it = paf_objects.erase(it);
+			}
+		}
+		it--;
+		if (best < 0.9*(*(it))->q_length) it = paf_objects.erase(it);
+		it++;
+	}
 	auto paf_cmp = [](const std::unique_ptr<PAFObject>& a, const std::unique_ptr<PAFObject>& b) { 
  		if (a->t_begin == b->t_begin) {
         	return (a->t_end > b->t_end);
@@ -110,7 +137,7 @@ void sweepLineAlgorithm(std::vector<std::unique_ptr<PAFObject>> &paf_objects) {
         return (a->t_begin < b->t_begin);
 	};
 	std::sort(paf_objects.begin(), paf_objects.end(), paf_cmp);
-	std::vector<std::unique_ptr<PAFObject>>::iterator it = paf_objects.begin();
+	it = paf_objects.begin();
 	std::vector<std::unique_ptr<PAFObject>>::iterator next;
 	while (it != --paf_objects.end()) {
 		next = std::next(it);
@@ -122,23 +149,62 @@ void sweepLineAlgorithm(std::vector<std::unique_ptr<PAFObject>> &paf_objects) {
 	}
 }
 
-void statistics(Vertex* end, FASTAEntity &reference) {
+std::string complement(std::string const &sequence){
+	std::string comp = "";
+	for (char const & c : sequence) {
+		comp = complement_map.at(c) + comp; 
+	}
+	return comp;
+}
+
+void statistics(Vertex* end, FASTAEntity &reference, std::string const &filePath, std::string const &reference_name) {
+	std::vector<std::unique_ptr<FASTAEntity>> reads;
+	auto reads_parser = bioparser::createParser<bioparser::FastaParser, FASTAEntity>(filePath);
+	reads_parser->parse(reads, -1);
 	int count = 1;
+	std::string part;
+	int startIndex = end->read.q_begin;
+	int endIndex = end->read.q_end;
 	FILE* file = fopen ("used_reads.txt","w");
+	FILE* genome = fopen ("genome.fasta","w");
 	int last_index = end->read.t_end;
+	int overlap = 0;
+	std::string seq;
+	fprintf (genome, ">%s\n", reference_name.c_str());
 	while (end->parent != NULL) {
 		count++;
+		for (auto const& r : reads) {
+			if (r->name == end->read.query_name) {
+				if (end->read.orientation == '+') {
+					seq = complement(r->sequence);
+				} else {
+					seq = r->sequence;
+				}
+				part.assign(seq, startIndex + overlap, endIndex - (startIndex + overlap));
+			}
+		}
+		fprintf (genome, "%s", part.c_str());
+		endIndex = end->read.q_begin;
 		fprintf (file, "%s %d %d\n", end->read.query_name.c_str(), end->read.t_begin, end->read.t_end);
+		overlap = end->read.t_begin;
 		end = end->parent;
+		overlap = end->read.t_end - overlap;
+		startIndex = end->read.q_begin;
 	}
+	for (auto const& r : reads) {
+		if (r->name == end->read.query_name) part.assign(r->sequence, startIndex + overlap, endIndex - (startIndex + overlap));
+	}
+	fprintf (genome, "%s", part.c_str());
+	fprintf (file, "%s %d %d\n", end->read.query_name.c_str(), end->read.t_begin, end->read.t_end);
 	fclose (file);
+	fclose (genome);
 	printf("Genome coverage: %f%%\n", (last_index - end->read.t_begin) / (float) reference.sequence.length() * 100);
 	printf("Number of used reads: %d\n", count);
 }
 
 void help() {
 	printf("Program accepts three arguments and prints assemblying statistics.\n");
-	printf("Usage: assembly <alignment file file> <reference file> <repeats file>\n");
+	printf("Usage: assembly <alignment file file> <reference file> <repeats file> <reads file>\n");
 	printf("Arguments should be in PAF, fasta and rpt file format\n");
 }
 
@@ -176,7 +242,7 @@ int main(int argc, char** argv) {
 	std::vector<std::unique_ptr<PAFObject>> paf_objects;
 	auto paf_parser = bioparser::createParser<bioparser::PafParser, PAFObject>(argv[optind]);
 	paf_parser->parse(paf_objects, -1);
-	sweepLineAlgorithm(paf_objects);
+	clear_contained_reads(paf_objects);
 
 	std::vector<std::unique_ptr<FASTAEntity>> ref_objects;
 	auto fasta_parser = bioparser::createParser<bioparser::FastaParser, FASTAEntity>(argv[optind + 1]);
@@ -208,7 +274,7 @@ int main(int argc, char** argv) {
 
 	Vertex* end = DepthFirstSearch(heads);
 
-	statistics(end, reference);
+	statistics(end, reference, argv[optind + 3], reference.name);
 
 	return 0;
 
