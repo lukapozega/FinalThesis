@@ -20,7 +20,7 @@ namespace repeats_parser {
 		std::string loc;
 		int start, end;
 		while (std::getline(input, line)) {
-			name = line.substr(1, line.find(":"));
+			name = line.substr(1, line.find(" "));
 			loc = line.substr(line.find(":") + 1);
 			start = std::atoi(loc.substr(0, loc.find("-")).c_str());
 			end = std::atoi(loc.substr(loc.find("-") + 1).c_str());
