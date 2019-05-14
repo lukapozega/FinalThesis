@@ -109,39 +109,30 @@ Vertex* DepthFirstSearch(std::vector<Vertex*> heads) {
 	return longest;
 }
 
+bool paf_unique(const std::unique_ptr<PAFObject>& a, const std::unique_ptr<PAFObject>& b) {
+	return a->query_name == b->query_name;
+}
+
 void clear_contained_reads(std::vector<std::unique_ptr<PAFObject>> &paf_objects) {
 	std::vector<std::unique_ptr<PAFObject>>::iterator it = paf_objects.begin();
-	int best;
-	std::string name;
-	while (it != --paf_objects.end()) {
-		name = (*it)->query_name;
-		best = (*it)->q_end - (*it)->q_begin;
-		it++;
-		while ((*it)->query_name == name) {
-			if ((*it)->q_end - (*it)->q_begin > best) {
-				name = (*it)->query_name;
-				best = (*it)->q_end - (*it)->q_begin;
-				it = paf_objects.erase(--it);
-			} else {
-				it = paf_objects.erase(it);
-			}
-		}
-		it--;
-		if (best < 0.9*(*(it))->q_length) it = paf_objects.erase(it);
-		it++;
-	}
-	auto paf_cmp = [](const std::unique_ptr<PAFObject>& a, const std::unique_ptr<PAFObject>& b) { 
- 		if (a->t_begin == b->t_begin) {
-        	return (a->t_end > b->t_end);
-        }
-        return (a->t_begin < b->t_begin);
+	it = std::unique (paf_objects.begin(), paf_objects.end(), paf_unique);
+	paf_objects.resize(std::distance(paf_objects.begin(), it));
+	paf_objects.erase(std::remove_if(paf_objects.begin(), paf_objects.end(), [](std::unique_ptr<PAFObject> &p){return p->q_end - p->q_begin < 0.9 * p->q_length;}), paf_objects.end());
+	auto paf_cmp = [](const std::unique_ptr<PAFObject>& a, const std::unique_ptr<PAFObject>& b) {
+		if (a->target_name == b->target_name) { 
+	 		if (a->t_begin == b->t_begin) {
+	        	return (a->t_end > b->t_end);
+	        }
+	        return (a->t_begin < b->t_begin);
+	    }
+	    return (a->target_name > b->target_name);
 	};
 	std::sort(paf_objects.begin(), paf_objects.end(), paf_cmp);
 	it = paf_objects.begin();
 	std::vector<std::unique_ptr<PAFObject>>::iterator next;
 	while (it != --paf_objects.end()) {
 		next = std::next(it);
-		while ((*next)->t_end <= (*it)->t_end) {
+		while ((*next)->t_end <= (*it)->t_end && (*next)->target_name == (*it)->target_name) {
 			next = paf_objects.erase(next);
 			if(next == paf_objects.end()) return;
 		}
