@@ -129,14 +129,15 @@ void clear_contained_reads(std::vector<std::unique_ptr<PAFObject>> &paf_objects)
 	};
 	std::sort(paf_objects.begin(), paf_objects.end(), paf_cmp);
 	it = paf_objects.begin();
-	std::vector<std::unique_ptr<PAFObject>>::iterator next;
+	int s, e;
+	std::string n;
 	while (it != --paf_objects.end()) {
-		next = std::next(it);
-		while ((*next)->t_end <= (*it)->t_end && (*next)->target_name == (*it)->target_name) {
-			next = paf_objects.erase(next);
-			if(next == paf_objects.end()) return;
-		}
-		it = next;
+		s = (*it)->t_begin;
+		e = (*it)->t_end;
+		n = (*it)->target_name;
+		paf_objects.erase(std::remove_if(it+1, paf_objects.end(), [&s, &e, &n](std::unique_ptr<PAFObject> &p){return p->t_begin > s && p->t_end < e && p->target_name == n;}), paf_objects.end());
+		printf("%lu\n", paf_objects.size());
+		it++;
 	}
 }
 
