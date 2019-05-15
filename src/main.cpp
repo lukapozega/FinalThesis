@@ -13,6 +13,7 @@
 
 #include "bioparser/bioparser.hpp"
 #include "PAFObject.cpp"
+#include "FASTAQObject.cpp"
 #include "repeats_parser.h"
 
 struct option options[] = {
@@ -28,20 +29,6 @@ std::unordered_map<char, char> complement_map = {
 			{'C', 'G'},
 	};
 
-class FASTAEntity {
-	
-public:
-	std::string name;
-	std::string sequence;
-	
-	FASTAEntity(
-		const char *name, uint32_t name_length,
-		const char *sequence, uint32_t sequence_length) {
-		(this->name).assign(name, name_length);
-		(this->sequence).assign(sequence, sequence_length);
-	}
-};
-
 class Vertex {
 
 public:
@@ -54,59 +41,73 @@ public:
 	}
 };
 
-std::vector<Vertex*> create_graph(std::vector<Vertex> &vertices, std::vector<std::unique_ptr<PAFObject>> &paf_objects) {
+std::unordered_map<std::string, std::vector<Vertex*>> create_graph(std::vector<Vertex> &vertices, std::vector<std::unique_ptr<PAFObject>> &paf_objects) {
 	for (auto const& paf: paf_objects) {
 		vertices.emplace_back(Vertex(*paf));
 	}
 	std::vector<Vertex>::iterator it = vertices.begin();
 	std::vector<Vertex>::iterator next;
 	std::vector<Vertex*> heads;
+	std::unordered_map<std::string, std::vector<Vertex*>> re;
 	heads.emplace_back(&(*it));
 	while(it != --vertices.end()) {
 		next = std::next(it);
-		while ((*next).read.t_begin <= (*it).read.t_end) {
+		if ((*next).read.target_name != (*it).read.target_name) {
+			re[(*it).read.target_name] = heads;
+			heads.clear();
+			heads.emplace_back(&(*next));
+			it++;
+			continue;
+		}
+		while ((*next).read.t_begin <= (*it).read.t_end && (*next).read.target_name == (*it).read.target_name) {
 			it->vertices.emplace_back(&(*next));
 			next++;
 			if(next == vertices.end()) break;
 		}
-		if (next == std::next(it)) heads.emplace_back(&(*next));
+		if (next == std::next(it) && (*next).read.target_name == (*std::next(it)).read.target_name) heads.emplace_back(&(*next));
 		it++;
 	}
-	FILE* file = fopen ("network.txt","w");
-	for (auto const& vertex : vertices) {
-		fprintf (file, "%d %d", vertex.read.t_begin, vertex.read.t_end);
-		for (auto const& next: vertex.vertices) {
-			fprintf (file, " %d", next->read.t_begin);
-		}
-		fprintf (file, "\n");
-	}
-	fclose (file);
-	return heads;
+	re[(*it).read.target_name] = heads;
+	heads.clear();
+	// FILE* file = fopen ("network.txt","w");
+	// for (auto const& vertex : vertices) {
+	// 	fprintf (file, "%d %d", vertex.read.t_begin, vertex.read.t_end);
+	// 	for (auto const& next: vertex.vertices) {
+	// 		fprintf (file, " %d", next->read.t_begin);
+	// 	}
+	// 	fprintf (file, "\n");
+	// }
+	// fclose (file);
+	return re;
 }
 
-Vertex* DepthFirstSearch(std::vector<Vertex*> heads) {
+std::vector<Vertex*> DepthFirstSearch(std::unordered_map<std::string, std::vector<Vertex*>> heads) {
 	Vertex* max;
 	Vertex* head;
 	Vertex* longest;
-	int length=0;
+	std::vector<Vertex*> ends;
 	int begin;
-	for (int i = 0; i < heads.size(); i++) {
-		head = heads[i];
-		begin = head->read.t_begin;
-		while(!head->vertices.empty()) {
-			max = head->vertices[0];
-			for (auto const& vertex : head->vertices) {
-				if (vertex->read.t_begin > max->read.t_begin) max = vertex;
+	for (auto const& seq: heads) {
+		int length=0;
+		for (int i = 0; i < seq.second.size(); i++) {
+			head = seq.second[i];
+			begin = head->read.t_begin;
+			while(!head->vertices.empty()) {
+				max = head->vertices[0];
+				for (auto const& vertex : head->vertices) {
+					if (vertex->read.t_begin > max->read.t_begin) max = vertex;
+				}
+				max->parent = head;
+				head = max;
 			}
-			max->parent = head;
-			head = max;
+			if (length < head->read.t_begin - begin) {
+				length = head->read.t_begin - begin;
+				longest = head;
+			}
 		}
-		if (length < head->read.t_begin - begin) {
-			length = head->read.t_begin - begin;
-			longest = head;
-		}
+		ends.emplace_back(longest);
 	}
-	return longest;
+	return ends;
 }
 
 bool paf_unique(const std::unique_ptr<PAFObject>& a, const std::unique_ptr<PAFObject>& b) {
@@ -135,10 +136,16 @@ void clear_contained_reads(std::vector<std::unique_ptr<PAFObject>> &paf_objects)
 		s = (*it)->t_begin;
 		e = (*it)->t_end;
 		n = (*it)->target_name;
-		paf_objects.erase(std::remove_if(it+1, paf_objects.end(), [&s, &e, &n](std::unique_ptr<PAFObject> &p){return p->t_begin > s && p->t_end < e && p->target_name == n;}), paf_objects.end());
-		printf("%lu\n", paf_objects.size());
-		it++;
+		paf_objects.erase(std::remove_if(it+1, paf_objects.end(), [&s, &e, &n](std::unique_ptr<PAFObject> &p){return p->t_begin >= s && p->t_end <= e && p->target_name == n;}), paf_objects.end());
+		if (it != --paf_objects.end()) {
+			it++;
+		}
 	}
+}
+
+bool file_format(const std::string &str, const std::string &suffix) {
+    return str.size() >= suffix.size() &&
+           str.compare(str.size() - suffix.size(), suffix.size(), suffix) == 0;
 }
 
 std::string complement(std::string const &sequence){
@@ -149,55 +156,63 @@ std::string complement(std::string const &sequence){
 	return comp;
 }
 
-void statistics(Vertex* end, FASTAEntity &reference, std::string const &filePath, std::string const &reference_name) {
-	std::vector<std::unique_ptr<FASTAEntity>> reads;
-	auto reads_parser = bioparser::createParser<bioparser::FastaParser, FASTAEntity>(filePath);
-	reads_parser->parse(reads, -1);
-	int count = 1;
+void statistics(std::vector<Vertex*> ends, std::vector<std::unique_ptr<FASTAQEntity>> & ref_objects, std::string const &file_path) {
+	std::vector<std::unique_ptr<FASTAQEntity>> reads;
+	if (file_format(file_path, ".fastq")) {
+		auto reads_parser = bioparser::createParser<bioparser::FastqParser, FASTAQEntity>(file_path);
+		reads_parser->parse(reads, -1);
+	} else {
+		auto reads_parser = bioparser::createParser<bioparser::FastaParser, FASTAQEntity>(file_path);
+		reads_parser->parse(reads, -1);
+	}
 	std::string part;
-	int startIndex = end->read.q_begin;
-	int endIndex = end->read.q_end;
+	printf("Writing to files...\n\n");
 	FILE* file = fopen ("used_reads.txt","w");
 	FILE* genome = fopen ("genome.fasta","w");
-	int last_index = end->read.t_end;
-	int overlap = 0;
+	int startIndex, endIndex, last_index, overlap, used_reads;
 	std::string seq;
-	fprintf (genome, ">%s\n", reference_name.c_str());
-	while (end->parent != NULL) {
-		count++;
-		for (auto const& r : reads) {
-			if (r->name == end->read.query_name) {
-				if (end->read.orientation == '+') {
-					seq = complement(r->sequence);
-				} else {
-					seq = r->sequence;
-				}
-				part.assign(seq, startIndex + overlap, endIndex - (startIndex + overlap));
-			}
-		}
-		fprintf (genome, "%s", part.c_str());
-		endIndex = end->read.q_begin;
-		fprintf (file, "%s %d %d\n", end->read.query_name.c_str(), end->read.t_begin, end->read.t_end);
-		overlap = end->read.t_begin;
-		end = end->parent;
-		overlap = end->read.t_end - overlap;
+	Vertex* curr;
+	for (auto const& end : ends) {
 		startIndex = end->read.q_begin;
+		endIndex = end->read.q_end;
+		last_index = end->read.t_end;
+		overlap = 0;
+		used_reads = 0;
+		curr = end;
+		fprintf (genome, ">%s\n", end->read.target_name.c_str());
+		while (curr->parent != NULL) {
+			used_reads++;
+			for (auto const& r : reads) {
+				if (r->name == curr->read.query_name) {
+					if (curr->read.orientation == '+') {
+						seq = complement(r->sequence);
+					} else {
+						seq = r->sequence;
+					}
+					part.assign(seq, startIndex + overlap, endIndex - (startIndex + overlap));
+					break;
+				}
+			}
+			fprintf (genome, "%s", part.c_str());
+			endIndex = curr->read.q_begin;
+			fprintf (file, "%s %s %d %d\n", curr->read.query_name.c_str(), curr->read.target_name.c_str(), curr->read.t_begin, curr->read.t_end);
+			overlap = curr->read.t_begin;
+			curr = curr->parent;
+			overlap = curr->read.t_end - overlap;
+			startIndex = curr->read.q_begin;
+		}
+		fprintf(genome, "\n");
+		printf("%s coverage: %f%%\n", end->read.target_name.c_str(), (last_index-curr->read.t_begin) / (float) curr->read.t_length * 100);
+		printf("Number of used reads: %d\n",used_reads);
 	}
-	for (auto const& r : reads) {
-		if (r->name == end->read.query_name) part.assign(r->sequence, startIndex + overlap, endIndex - (startIndex + overlap));
-	}
-	fprintf (genome, "%s", part.c_str());
-	fprintf (file, "%s %d %d\n", end->read.query_name.c_str(), end->read.t_begin, end->read.t_end);
 	fclose (file);
 	fclose (genome);
-	printf("Genome coverage: %f%%\n", (last_index - end->read.t_begin) / (float) reference.sequence.length() * 100);
-	printf("Number of used reads: %d\n", count);
 }
 
 void help() {
 	printf("Program accepts three arguments and prints assemblying statistics.\n");
-	printf("Usage: assembly <alignment file file> <reference file> <repeats file> <reads file>\n");
-	printf("Arguments should be in PAF, fasta and rpt file format\n");
+	printf("Usage: assembly <alignment file > <reference file> <repeats file> <reads file>\n");
+	printf("Arguments should be in PAF, fasta rpt and fasta/fastq file format\n");
 }
 
 void version() {
@@ -236,10 +251,9 @@ int main(int argc, char** argv) {
 	paf_parser->parse(paf_objects, -1);
 	clear_contained_reads(paf_objects);
 
-	std::vector<std::unique_ptr<FASTAEntity>> ref_objects;
-	auto fasta_parser = bioparser::createParser<bioparser::FastaParser, FASTAEntity>(argv[optind + 1]);
+	std::vector<std::unique_ptr<FASTAQEntity>> ref_objects;
+	auto fasta_parser = bioparser::createParser<bioparser::FastaParser, FASTAQEntity>(argv[optind + 1]);
 	fasta_parser->parse(ref_objects, -1);
-	FASTAEntity reference = *ref_objects[0];
 
 	std::vector<std::tuple<std::string, int, int>> repeats;
 	if (!repeats_parser::parse(repeats, argv[3])) {
@@ -249,24 +263,14 @@ int main(int argc, char** argv) {
 
 	repeats_parser::remove_covered(repeats, paf_objects);
 
-	auto repeats_result = repeats_parser::check_repeats(repeats, reference.sequence);
-
-	if (std::get<0>(repeats_result) != -1) {
-		printf("Genome can't be assembled\n");
-		printf("Non covered areas are matching:\n");
-		printf("%d-%d\n", std::get<0>(repeats_result),std::get<1>(repeats_result));
-		printf("%d-%d\n", std::get<2>(repeats_result),std::get<3>(repeats_result));
-		return 0;
-	}
+	repeats_parser::check_repeats(repeats, ref_objects);
 
 	std::vector<Vertex> vertices;
-	std::vector<Vertex*> heads = create_graph(vertices, paf_objects);
+	std::unordered_map<std::string, std::vector<Vertex*>> heads = create_graph(vertices, paf_objects);
 
-	printf("Number of components: %lu\n", heads.size());
+	std::vector<Vertex*> ends = DepthFirstSearch(heads);
 
-	Vertex* end = DepthFirstSearch(heads);
-
-	statistics(end, reference, argv[optind + 3], reference.name);
+	statistics(ends, ref_objects, argv[optind + 3]);
 
 	return 0;
 
