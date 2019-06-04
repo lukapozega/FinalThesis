@@ -41,6 +41,25 @@ public:
 	}
 };
 
+void add_breakpoints(std::vector<std::unique_ptr<PAFObject>> &paf_objects, std::vector<std::tuple<std::string, int, int>> &repeats) {
+	std::vector<std::unique_ptr<PAFObject>>::iterator it = paf_objects.begin();
+	std::vector<std::unique_ptr<PAFObject>>::iterator to_remove;
+	while (it != paf_objects.end()) {
+		for (auto const& r : repeats) {
+			if ((*it)->t_begin > std::get<1>(r) && (*it)->t_end < std::get<2>(r)) {
+				to_remove = it++;
+				(*to_remove) = NULL;
+				if (it == paf_objects.end()) {
+					paf_objects.erase(std::remove_if(paf_objects.begin(), paf_objects.end(), [](std::unique_ptr<PAFObject> &p) {return p == NULL;}), paf_objects.end());
+					return;
+				}
+			}
+		}
+		it++;
+	}
+	paf_objects.erase(std::remove_if(paf_objects.begin(), paf_objects.end(), [](std::unique_ptr<PAFObject> &p) {return p == NULL;}), paf_objects.end());
+}
+
 std::unordered_map<std::string, std::vector<Vertex*>> create_graph(std::vector<Vertex> &vertices, std::vector<std::unique_ptr<PAFObject>> &paf_objects) {
 	for (auto const& paf: paf_objects) {
 		vertices.emplace_back(Vertex(*paf));
@@ -64,7 +83,7 @@ std::unordered_map<std::string, std::vector<Vertex*>> create_graph(std::vector<V
 			next++;
 			if(next == vertices.end()) break;
 		}
-		if (next == std::next(it) && (*next).read.t_name == (*std::next(it)).read.t_name){
+		if (next == std::next(it)){
 		 	heads.emplace_back(&(*next));
 		}
 		it++;
@@ -143,8 +162,8 @@ void clear_contained_reads(std::vector<std::unique_ptr<PAFObject>> &paf_objects)
 	while (it != --paf_objects.end()) {
         do {
         	next = std::next(it);
-        } while ((*next) == NULL);
-        while ((*next)->t_end <= (*it)->t_end) {
+        } while ((*next) == NULL && (*next)->t_name == (*it)->t_name);
+        while ((*next)->t_end <= (*it)->t_end && (*next)->t_name == (*it)->t_name) {
             to_remove = next;
             do {
                 next++;
@@ -280,7 +299,7 @@ int main(int argc, char** argv) {
 
 	repeats_parser::remove_covered(repeats, paf_objects);
 
-	repeats_parser::check_repeats(repeats, ref_objects);
+	add_breakpoints(paf_objects, repeats);
 
 	std::vector<Vertex> vertices;
 	std::unordered_map<std::string, std::vector<Vertex*>> heads = create_graph(vertices, paf_objects);

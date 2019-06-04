@@ -45,8 +45,8 @@ namespace repeats_parser {
 		std::vector<std::tuple<std::string, int, int>>::iterator current_rpt = repeats.begin();
 		std::vector<std::string> ids;
 		for (auto const &p : paf_objects) {
-			if (std::find(ids.begin(), ids.end(), p->target_name) == ids.end()){
-				ids.emplace_back(p->target_name);
+			if (std::find(ids.begin(), ids.end(), p->t_name) == ids.end()){
+				ids.emplace_back(p->t_name);
 			}
 		}
 		int i;
@@ -54,8 +54,8 @@ namespace repeats_parser {
 			while (std::get<0>(*current_rpt) != name) {
 				current_rpt++;
 			}
-			while(current_paf != paf_objects.end() && (*current_paf)->target_name == name) {
-				while(std::get<2>(*current_rpt) <= (*current_paf)->t_end && std::get<0>(*current_rpt) == (*current_paf)->target_name) {
+			while(current_paf != paf_objects.end() && (*current_paf)->t_name == name) {
+				while(std::get<2>(*current_rpt) <= (*current_paf)->t_end && std::get<0>(*current_rpt) == (*current_paf)->t_name) {
 					if (std::get<1>(*current_rpt) >= (*current_paf)->t_begin) {
 						current_rpt = repeats.erase(current_rpt);
 					} else {
