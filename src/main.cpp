@@ -52,32 +52,33 @@ std::unordered_map<std::string, std::vector<Vertex*>> create_graph(std::vector<V
 	heads.emplace_back(&(*it));
 	while(it != --vertices.end()) {
 		next = std::next(it);
-		if ((*next).read.target_name != (*it).read.target_name) {
-			re[(*it).read.target_name] = heads;
+		if ((*next).read.t_name != (*it).read.t_name) {
+			re[(*it).read.t_name] = heads;
 			heads.clear();
 			heads.emplace_back(&(*next));
 			it++;
 			continue;
 		}
-		while ((*next).read.t_begin <= (*it).read.t_end && (*next).read.target_name == (*it).read.target_name) {
+		while ((*next).read.t_begin <= (*it).read.t_end && (*next).read.t_name == (*it).read.t_name) {
 			it->vertices.emplace_back(&(*next));
 			next++;
 			if(next == vertices.end()) break;
 		}
-		if (next == std::next(it) && (*next).read.target_name == (*std::next(it)).read.target_name) heads.emplace_back(&(*next));
+		if (next == std::next(it) && (*next).read.t_name == (*std::next(it)).read.t_name){
+		 	heads.emplace_back(&(*next));
+		}
 		it++;
 	}
-	re[(*it).read.target_name] = heads;
+	re[(*it).read.t_name] = heads;
 	heads.clear();
-	// FILE* file = fopen ("network.txt","w");
-	// for (auto const& vertex : vertices) {
-	// 	fprintf (file, "%d %d", vertex.read.t_begin, vertex.read.t_end);
-	// 	for (auto const& next: vertex.vertices) {
-	// 		fprintf (file, " %d", next->read.t_begin);
-	// 	}
-	// 	fprintf (file, "\n");
-	// }
-	// fclose (file);
+	FILE* file = fopen ("network.gfa","w");
+	for (auto const& vertex : vertices) {
+		fprintf (file, "S\t%s\t%c\tLN:i:%u\n", vertex.read.q_name.c_str(), '*', vertex.read.q_length);
+		for (auto const& next: vertex.vertices) {
+			fprintf (file, "L\t%s\t%c\t%s\t%c\t%c\n", vertex.read.q_name.c_str(), vertex.read.orientation, next->read.q_name.c_str(), next->read.orientation, '*');
+		}
+	}
+	fclose (file);
 	return re;
 }
 
@@ -111,36 +112,63 @@ std::vector<Vertex*> DepthFirstSearch(std::unordered_map<std::string, std::vecto
 }
 
 bool paf_unique(const std::unique_ptr<PAFObject>& a, const std::unique_ptr<PAFObject>& b) {
-	return a->query_name == b->query_name;
+	return a->q_name == b->q_name;
 }
 
 void clear_contained_reads(std::vector<std::unique_ptr<PAFObject>> &paf_objects) {
+	auto long_cmp = [](const std::unique_ptr<PAFObject>& a, const std::unique_ptr<PAFObject>& b) {
+        if (a->q_name == b->q_name) {
+            return (a->t_end - a->t_begin > b->t_end - b->t_begin);
+        }
+        return (a->q_name > b->q_name);
+    };
+    std::sort(paf_objects.begin(), paf_objects.end(), long_cmp);
 	std::vector<std::unique_ptr<PAFObject>>::iterator it = paf_objects.begin();
 	it = std::unique (paf_objects.begin(), paf_objects.end(), paf_unique);
 	paf_objects.resize(std::distance(paf_objects.begin(), it));
 	paf_objects.erase(std::remove_if(paf_objects.begin(), paf_objects.end(), [](std::unique_ptr<PAFObject> &p){return p->q_end - p->q_begin < 0.9 * p->q_length;}), paf_objects.end());
 	auto paf_cmp = [](const std::unique_ptr<PAFObject>& a, const std::unique_ptr<PAFObject>& b) {
-		if (a->target_name == b->target_name) { 
+		if (a->t_name == b->t_name) { 
 	 		if (a->t_begin == b->t_begin) {
 	        	return (a->t_end > b->t_end);
 	        }
 	        return (a->t_begin < b->t_begin);
 	    }
-	    return (a->target_name > b->target_name);
+	    return (a->t_name > b->t_name);
 	};
 	std::sort(paf_objects.begin(), paf_objects.end(), paf_cmp);
 	it = paf_objects.begin();
-	int s, e;
-	std::string n;
+	std::vector<std::unique_ptr<PAFObject>>::iterator next;
+	std::vector<std::unique_ptr<PAFObject>>::iterator to_remove;
 	while (it != --paf_objects.end()) {
-		s = (*it)->t_begin;
-		e = (*it)->t_end;
-		n = (*it)->target_name;
-		paf_objects.erase(std::remove_if(it+1, paf_objects.end(), [&s, &e, &n](std::unique_ptr<PAFObject> &p){return p->t_begin >= s && p->t_end <= e && p->target_name == n;}), paf_objects.end());
-		if (it != --paf_objects.end()) {
-			it++;
-		}
-	}
+        do {
+        	next = std::next(it);
+        } while ((*next) == NULL);
+        while ((*next)->t_end <= (*it)->t_end) {
+            to_remove = next;
+            do {
+                next++;
+            } while ((*next) == NULL && next != paf_objects.end());
+            (*to_remove) = NULL;
+            if(next == paf_objects.end()) {
+                paf_objects.erase(std::remove_if(paf_objects.begin(), paf_objects.end(), [](std::unique_ptr<PAFObject> &p) {return p == NULL;}), paf_objects.end());
+                return;
+            }
+        }
+        it = next;
+    }
+    paf_objects.erase(std::remove_if(paf_objects.begin(), paf_objects.end(), [](std::unique_ptr<PAFObject> &p) {return p == NULL;}), paf_objects.end());
+	// int s, e;
+	// std::string n;
+	// while (it != --paf_objects.end()) {
+	// 	s = (*it)->t_begin;
+	// 	e = (*it)->t_end;
+	// 	n = (*it)->t_name;
+	// 	paf_objects.erase(std::remove_if(it+1, paf_objects.end(), [&s, &e, &n](std::unique_ptr<PAFObject> &p){return p->t_begin >= s && p->t_end <= e && p->t_name == n;}), paf_objects.end());
+	// 	if (it != --paf_objects.end()) {
+	// 		it++;
+	// 	}
+	// }
 }
 
 bool file_format(const std::string &str, const std::string &suffix) {
@@ -158,7 +186,7 @@ std::string complement(std::string const &sequence){
 
 void statistics(std::vector<Vertex*> ends, std::vector<std::unique_ptr<FASTAQEntity>> & ref_objects, std::string const &file_path) {
 	std::vector<std::unique_ptr<FASTAQEntity>> reads;
-	if (file_format(file_path, ".fastq")) {
+	if (file_format(file_path, ".fastq") || file_format(file_path, ".fastq.gz")) {
 		auto reads_parser = bioparser::createParser<bioparser::FastqParser, FASTAQEntity>(file_path);
 		reads_parser->parse(reads, -1);
 	} else {
@@ -179,11 +207,11 @@ void statistics(std::vector<Vertex*> ends, std::vector<std::unique_ptr<FASTAQEnt
 		overlap = 0;
 		used_reads = 0;
 		curr = end;
-		fprintf (genome, ">%s\n", end->read.target_name.c_str());
+		fprintf (genome, ">%s\n", end->read.t_name.c_str());
 		while (curr->parent != NULL) {
 			used_reads++;
 			for (auto const& r : reads) {
-				if (r->name == curr->read.query_name) {
+				if (r->name == curr->read.q_name) {
 					if (curr->read.orientation == '+') {
 						seq = complement(r->sequence);
 					} else {
@@ -195,14 +223,14 @@ void statistics(std::vector<Vertex*> ends, std::vector<std::unique_ptr<FASTAQEnt
 			}
 			fprintf (genome, "%s", part.c_str());
 			endIndex = curr->read.q_begin;
-			fprintf (file, "%s %s %d %d\n", curr->read.query_name.c_str(), curr->read.target_name.c_str(), curr->read.t_begin, curr->read.t_end);
+			fprintf (file, "%s %s %d %d\n", curr->read.q_name.c_str(), curr->read.t_name.c_str(), curr->read.t_begin, curr->read.t_end);
 			overlap = curr->read.t_begin;
 			curr = curr->parent;
 			overlap = curr->read.t_end - overlap;
 			startIndex = curr->read.q_begin;
 		}
 		fprintf(genome, "\n");
-		printf("%s coverage: %f%%\n", end->read.target_name.c_str(), (last_index-curr->read.t_begin) / (float) curr->read.t_length * 100);
+		printf("%s coverage: %f%%\n", end->read.t_name.c_str(), (last_index-curr->read.t_begin) / (float) curr->read.t_length * 100);
 		printf("Number of used reads: %d\n",used_reads);
 	}
 	fclose (file);
