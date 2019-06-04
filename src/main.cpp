@@ -158,17 +158,6 @@ void clear_contained_reads(std::vector<std::unique_ptr<PAFObject>> &paf_objects)
         it = next;
     }
     paf_objects.erase(std::remove_if(paf_objects.begin(), paf_objects.end(), [](std::unique_ptr<PAFObject> &p) {return p == NULL;}), paf_objects.end());
-	// int s, e;
-	// std::string n;
-	// while (it != --paf_objects.end()) {
-	// 	s = (*it)->t_begin;
-	// 	e = (*it)->t_end;
-	// 	n = (*it)->t_name;
-	// 	paf_objects.erase(std::remove_if(it+1, paf_objects.end(), [&s, &e, &n](std::unique_ptr<PAFObject> &p){return p->t_begin >= s && p->t_end <= e && p->t_name == n;}), paf_objects.end());
-	// 	if (it != --paf_objects.end()) {
-	// 		it++;
-	// 	}
-	// }
 }
 
 bool file_format(const std::string &str, const std::string &suffix) {
