@@ -3,6 +3,8 @@
 #include <vector>
 #include <string>
 #include <fstream> 
+#include <memory>
+#include <algorithm>
 #include <sstream>
 #include <tuple>
 
