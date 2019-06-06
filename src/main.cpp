@@ -7,6 +7,7 @@
 #include <fstream> 
 #include <sstream>
 #include <tuple>
+#include <algorithm>
 #include <unordered_map>
 
 #include "Config.h"
