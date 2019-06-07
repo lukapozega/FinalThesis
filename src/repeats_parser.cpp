@@ -85,30 +85,30 @@ namespace repeats_parser {
 		int m = target.length();
 		int i, j;
 		int **matrix = new int*[n+1];
-		for (int i = 0 ; i < n+1 ; i++) matrix[i] = new int[m+1];
+		for (int i = 0 ; i <= n ; i++) matrix[i] = new int[m+1];
 
-		for (i = 1; i <= n; i++) {
-			for (j = 1; j <= m; j++) {
+		for (i = 0; i <= n; i++) {
+			for (j = 0; j <= m; j++) {
 				matrix[i][j] = 0;
 			}
 		}
 
 		for (i = 0; i <= n; i++) {
-			matrix[i][0] = i;
+			matrix[i][0] = -i;
 		}
 	
 		for (j = 1; j <= m; j++) {
-			matrix[0][j] = j;
+			matrix[0][j] = -j;
 		}
 
 		for (i = 1; i <= n; i++) { 
 	        for (j = 1; j <= m; j++) {
-	            if (query[i - 1] == target[j - 1]) { 
+	            if (query[i-1] == target[j-1]) {
 	                matrix[i][j] = matrix[i - 1][j - 1]; 
 	            } else { 
-	                matrix[i][j] = std::max({matrix[i - 1][j - 1] + 1,  
-	                                matrix[i - 1][j] + 1,  
-	                                matrix[i][j - 1] + 1}); 
+	                matrix[i][j] = std::max({matrix[i - 1][j - 1] - 1,  
+	                                matrix[i - 1][j] - 1,  
+	                                matrix[i][j - 1] - 1}); 
 	            } 
         	} 
     	}
@@ -118,22 +118,33 @@ namespace repeats_parser {
 	void check_repeats(std::vector<std::tuple<std::string, int, int>> &repeats, std::vector<std::unique_ptr<FASTAQEntity>>& ref_objects) {
 		int i, j;
 		std::string first, second;
-		for (i = 0; i < repeats.size()-1; i++) {
-			for (j = i + 1; j < repeats.size(); j++) {
-				if (std::get<0>(repeats[i]) == std::get<0>(repeats[j])) {
+		std::vector<std::tuple<std::string, int, int>>::iterator current_rpt = repeats.begin();
+		std::vector<std::tuple<std::string, int, int>>::iterator it;
+		bool rm = true;
+		while (current_rpt != repeats.end()) {
+			it = current_rpt;
+			rm = true;
+			while (it != repeats.end()) {
+				if (std::get<0>(*current_rpt) == std::get<0>(*it) && it != current_rpt) {
 					for (auto const& ref : ref_objects) {
-						if (ref->name == std::get<0>(repeats[i])) {
-							first = ref->sequence.substr(std::get<1>(repeats[i]), (std::get<2>(repeats[i]) - std::get<1>(repeats[i])));
-							second = ref->sequence.substr(std::get<1>(repeats[j]), (std::get<2>(repeats[j]) - std::get<1>(repeats[j])));
+						if (ref->name == std::get<0>(*current_rpt)) {
+							first = ref->sequence.substr(std::get<1>(*current_rpt), (std::get<2>(*current_rpt) - std::get<1>(*current_rpt)));
+							second = ref->sequence.substr(std::get<1>(*it), (std::get<2>(*it) - std::get<1>(*it)));
+							break;
 						}
 					}
-					if (alignment(first, second) < 0.1 * std::max(std::get<2>(repeats[i]) - std::get<1>(repeats[i]), (std::get<2>(repeats[j]) - std::get<1>(repeats[j])))) {
-						printf("Non covered repeat on %s: %d-%d %d-%d\n", std::get<0>(repeats[i]).c_str(),
-																		std::get<1>(repeats[i]), std::get<2>(repeats[i]),
-																		std::get<1>(repeats[j]), std::get<2>(repeats[j]));
+					if (-alignment(first, second) < 0.15 * std::min(std::get<2>(*current_rpt) - std::get<1>(*current_rpt), (std::get<2>(*it) - std::get<1>(*it)))) {
+						rm = false;
 					}
 				}
+				it++;
 			}
+			if (rm) {
+				current_rpt = repeats.erase(current_rpt);
+				if (current_rpt == repeats.end()) return;
+				continue;
+			}
+			current_rpt++;
 		}
 		return;
 	}

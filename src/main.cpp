@@ -300,6 +300,8 @@ int main(int argc, char** argv) {
 
 	repeats_parser::remove_covered(repeats, paf_objects);
 
+	repeats_parser::check_repeats(repeats, ref_objects);
+
 	add_breakpoints(paf_objects, repeats);
 
 	std::vector<Vertex> vertices;
