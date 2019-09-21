@@ -2,6 +2,10 @@
 
 Final BSc thesis is a course held at University of Zagreb, Faculty of Electrical Engineering and Computing in the sixth semester of the undergraduate study. The main focus is to apply knowledge and skills obtained from Software Design Project course to recreate or improve existing methods which are widely used in bioinformatics. Under the supervision of prof. Mile Šikić, students will implement one such algorithm, thoroughly test it on simulated and real data, and formally encapsulate the whole process by writing and defending a thesis. Each student will have access to a private branch of this repository, on which this README will be updated with the specific task.
 
+## Description
+
+In this thesis, a tool for genome upper bound assembly was created. It was fully written in C++ and tested on couple of datasets. Tool outputs percentage of the genome coverage that is possible to build in an ideal case considering sequenced data provided at the input. It also creats a graph file in GFA format. Algorithms like sweep line, depth-first search and Needleman–Wunsch were implemented. Tool was tested on datasets of Escerichia coli and yeast Saccharomyces cerevisiae. It might be mainly used in evaluating quality of the sequenced data and other de novo assembly methods.
+
 ## Installation
 
 Tool can be installed by running bash script
